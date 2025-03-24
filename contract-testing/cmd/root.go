@@ -6,15 +6,9 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "contract-testing",
-	Short: "Provider-driven contract testing tool",
-	Long: `A comprehensive contract testing tool that implements provider-driven 
-contract testing to ensure API compatibility between services.
-
-This tool supports:
-- OpenAPI schema generation from provider services
-- Contract repository management
-- Verification against consumer expectations
-- Detailed compatibility reports`,
+	Short: "A provider-driven contract testing tool",
+	Long: `A tool for provider-driven contract testing that allows 
+services to validate their API contracts against consumer expectations.`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -23,7 +17,7 @@ func Execute() error {
 }
 
 func init() {
-	// Global flags can be defined here
-	rootCmd.PersistentFlags().StringP("repository", "r", "./contracts", "Path to contract repository")
-	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
+	rootCmd.AddCommand(generateCmd)
+	rootCmd.AddCommand(verifyCmd)
+	rootCmd.AddCommand(reportCmd)
 }

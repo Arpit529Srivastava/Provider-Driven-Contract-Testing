@@ -1,54 +1,43 @@
 package schema
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 
-	"gopkg.in/yaml.v3"
+	"gopkg.in/yaml.v2"
 )
 
-// Generator handles the generation of OpenAPI schemas from provider services
 type Generator struct {
-	ServiceName string
-	ServiceURL  string
+	providerName string
+	baseURL      string
+	client       *http.Client
 }
 
-// NewGenerator creates a new schema generator instance
-func NewGenerator(serviceName, serviceURL string) *Generator {
+func NewGenerator(providerName, baseURL string) *Generator {
 	return &Generator{
-		ServiceName: serviceName,
-		ServiceURL:  serviceURL,
+		providerName: providerName,
+		baseURL:      baseURL,
+		client:       &http.Client{},
 	}
 }
 
-// GenerateSchema analyzes a provider service and generates an OpenAPI schema
-func (g *Generator) GenerateSchema() (map[string]interface{}, error) {
-	// In a real implementation, this would use reflection, annotations, or swagger tools
-	// to automatically generate the OpenAPI schema. For this example, we'll simulate
-	// the generation for an order service.
+func (g *Generator) GenerateSchema(outputPath string) error {
+	// In a real implementation, this would introspect the API
+	// For this example, we'll create a simple schema for an order service
 	
-	// Try to fetch OpenAPI spec from the service directly if it exposes a swagger endpoint
-	resp, err := http.Get(fmt.Sprintf("%s/swagger/doc.json", g.ServiceURL))
-	if err == nil && resp.StatusCode == http.StatusOK {
-		var schema map[string]interface{}
-		if err := json.NewDecoder(resp.Body).Decode(&schema); err != nil {
-			return nil, fmt.Errorf("failed to decode swagger response: %w", err)
-		}
-		defer resp.Body.Close()
-		return schema, nil
-	}
-	
-	// If automated discovery fails, create a sample schema for demonstration purposes
 	schema := map[string]interface{}{
 		"openapi": "3.0.0",
 		"info": map[string]interface{}{
-			"title":       g.ServiceName,
-			"description": fmt.Sprintf("API for %s", g.ServiceName),
+			"title":       fmt.Sprintf("%s API", g.providerName),
+			"description": fmt.Sprintf("API contract for %s", g.providerName),
 			"version":     "1.0.0",
+		},
+		"servers": []map[string]interface{}{
+			{
+				"url": g.baseURL,
+			},
 		},
 		"paths": map[string]interface{}{
 			"/orders": map[string]interface{}{
@@ -59,7 +48,33 @@ func (g *Generator) GenerateSchema() (map[string]interface{}, error) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"$ref": "#/components/schemas/OrderRequest",
+									"type": "object",
+									"required": []string{
+										"userId", "items",
+									},
+									"properties": map[string]interface{}{
+										"userId": map[string]interface{}{
+											"type": "string",
+										},
+										"items": map[string]interface{}{
+											"type": "array",
+											"items": map[string]interface{}{
+												"type": "object",
+												"required": []string{
+													"productId", "quantity",
+												},
+												"properties": map[string]interface{}{
+													"productId": map[string]interface{}{
+														"type": "string",
+													},
+													"quantity": map[string]interface{}{
+														"type": "integer",
+														"minimum": 1,
+													},
+												},
+											},
+										},
+									},
 								},
 							},
 						},
@@ -70,41 +85,36 @@ func (g *Generator) GenerateSchema() (map[string]interface{}, error) {
 							"content": map[string]interface{}{
 								"application/json": map[string]interface{}{
 									"schema": map[string]interface{}{
-										"$ref": "#/components/schemas/OrderResponse",
-									},
-								},
-							},
-						},
-						"400": map[string]interface{}{
-							"description": "Invalid input",
-						},
-					},
-				},
-				"get": map[string]interface{}{
-					"summary": "List all orders",
-					"responses": map[string]interface{}{
-						"200": map[string]interface{}{
-							"description": "List of orders",
-							"content": map[string]interface{}{
-								"application/json": map[string]interface{}{
-									"schema": map[string]interface{}{
-										"type": "array",
-										"items": map[string]interface{}{
-											"$ref": "#/components/schemas/OrderResponse",
+										"type": "object",
+										"properties": map[string]interface{}{
+											"orderId": map[string]interface{}{
+												"type": "string",
+											},
+											"status": map[string]interface{}{
+												"type": "string",
+												"enum": []string{"pending"},
+											},
+											"createdAt": map[string]interface{}{
+												"type": "string",
+												"format": "date-time",
+											},
 										},
 									},
 								},
 							},
 						},
+						"400": map[string]interface{}{
+							"description": "Invalid request",
+						},
 					},
 				},
 			},
-			"/orders/{id}": map[string]interface{}{
+			"/orders/{orderId}": map[string]interface{}{
 				"get": map[string]interface{}{
-					"summary": "Get an order by ID",
+					"summary": "Get order by ID",
 					"parameters": []map[string]interface{}{
 						{
-							"name": "id",
+							"name": "orderId",
 							"in": "path",
 							"required": true,
 							"schema": map[string]interface{}{
@@ -118,7 +128,37 @@ func (g *Generator) GenerateSchema() (map[string]interface{}, error) {
 							"content": map[string]interface{}{
 								"application/json": map[string]interface{}{
 									"schema": map[string]interface{}{
-										"$ref": "#/components/schemas/OrderResponse",
+										"type": "object",
+										"properties": map[string]interface{}{
+											"orderId": map[string]interface{}{
+												"type": "string",
+											},
+											"userId": map[string]interface{}{
+												"type": "string",
+											},
+											"status": map[string]interface{}{
+												"type": "string",
+												"enum": []string{"pending", "processing", "shipped", "delivered", "cancelled"},
+											},
+											"items": map[string]interface{}{
+												"type": "array",
+												"items": map[string]interface{}{
+													"type": "object",
+													"properties": map[string]interface{}{
+														"productId": map[string]interface{}{
+															"type": "string",
+														},
+														"quantity": map[string]interface{}{
+															"type": "integer",
+														},
+													},
+												},
+											},
+											"createdAt": map[string]interface{}{
+												"type": "string",
+												"format": "date-time",
+											},
+										},
 									},
 								},
 							},
@@ -130,119 +170,21 @@ func (g *Generator) GenerateSchema() (map[string]interface{}, error) {
 				},
 			},
 		},
-		"components": map[string]interface{}{
-			"schemas": map[string]interface{}{
-				"OrderRequest": map[string]interface{}{
-					"type": "object",
-					"required": []string{"items", "customerId"},
-					"properties": map[string]interface{}{
-						"items": map[string]interface{}{
-							"type": "array",
-							"items": map[string]interface{}{
-								"$ref": "#/components/schemas/OrderItem",
-							},
-						},
-						"customerId": map[string]interface{}{
-							"type": "string",
-						},
-						"shippingAddress": map[string]interface{}{
-							"$ref": "#/components/schemas/Address",
-						},
-					},
-				},
-				"OrderResponse": map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"orderId": map[string]interface{}{
-							"type": "string",
-						},
-						"items": map[string]interface{}{
-							"type": "array",
-							"items": map[string]interface{}{
-								"$ref": "#/components/schemas/OrderItem",
-							},
-						},
-						"customerId": map[string]interface{}{
-							"type": "string",
-						},
-						"status": map[string]interface{}{
-							"type": "string",
-							"enum": []string{"pending", "processing", "shipped", "delivered"},
-							"default": "pending",
-						},
-						"createdAt": map[string]interface{}{
-							"type": "string",
-							"format": "date-time",
-						},
-						"total": map[string]interface{}{
-							"type": "number",
-							"format": "float",
-						},
-						"shippingAddress": map[string]interface{}{
-							"$ref": "#/components/schemas/Address",
-						},
-					},
-				},
-				"OrderItem": map[string]interface{}{
-					"type": "object",
-					"required": []string{"productId", "quantity"},
-					"properties": map[string]interface{}{
-						"productId": map[string]interface{}{
-							"type": "string",
-						},
-						"quantity": map[string]interface{}{
-							"type": "integer",
-							"minimum": 1,
-						},
-						"unitPrice": map[string]interface{}{
-							"type": "number",
-							"format": "float",
-						},
-					},
-				},
-				"Address": map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"street": map[string]interface{}{
-							"type": "string",
-						},
-						"city": map[string]interface{}{
-							"type": "string",
-						},
-						"state": map[string]interface{}{
-							"type": "string",
-						},
-						"zipCode": map[string]interface{}{
-							"type": "string",
-						},
-						"country": map[string]interface{}{
-							"type": "string",
-						},
-					},
-				},
-			},
-		},
 	}
 	
-	return schema, nil
-}
-
-// SaveSchema saves the generated schema to the specified output path
-func (g *Generator) SaveSchema(schema map[string]interface{}, outputPath string) error {
-	// Create output directory if it doesn't exist
-	if err := os.MkdirAll(outputPath, 0755); err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
+	// Create directory if it doesn't exist
+	dir := filepath.Dir(outputPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
 	}
 	
-	// Convert schema to YAML
+	// Convert to YAML and write to file
 	yamlData, err := yaml.Marshal(schema)
 	if err != nil {
-		return fmt.Errorf("failed to marshal schema to YAML: %w", err)
+		return fmt.Errorf("failed to marshal schema: %w", err)
 	}
 	
-	// Write schema to file
-	outputFile := filepath.Join(outputPath, "openapi.yaml")
-	if err := ioutil.WriteFile(outputFile, yamlData, 0644); err != nil {
+	if err := os.WriteFile(outputPath, yamlData, 0644); err != nil {
 		return fmt.Errorf("failed to write schema to file: %w", err)
 	}
 	

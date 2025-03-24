@@ -3,9 +3,7 @@ Copyright © 2025 Arpit Srivastava Arpitsrivasatava@gmail.com
 */
 package main
 
-import (
-	"provider-contract-testing/cmd"
-)
+import "github.com/Arpit529srivastava/cmd"
 
 func main() {
 	cmd.Execute()
