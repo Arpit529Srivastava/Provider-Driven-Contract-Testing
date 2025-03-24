@@ -1,37 +1,33 @@
 {
-  "provider": "order-service",
-  "consumer": "user-service",
-  "description": "Create a new order",
-  "request": {
-    "method": "POST",
-    "endpoint": "/orders",
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "body": {
-      "userId": "user_123",
-      "items": [
-        {
-          "productId": 1,  
-          "quantity": "2" 
-        }
-      ],
-      "newUnexpectedField": "test"  
-    }
-  },
-  "response": {
-    "statusCode": 200, 
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "body": {
-      "orderId": "ord_12345",
-      "status": "PROCESSING",  
-      "createdAt": "2025-03-24T10:00:00Z",
-      "additionalMetadata": {  
-        "source": "web"
+    "provider": "order-service",
+    "consumer": "user-service",
+    "description": "Create a new order",
+    "request": {
+      "method": "POST",
+      "endpoint": "/orders",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "userId": "user_123",
+        "items": [
+          {
+            "productId": "prod_1",
+            "quantity": 2
+          }
+        ]
       }
-    }
-  },
-  "dependencies": []
-}
+    },
+    "response": {
+      "statusCode": 201,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "orderId": "ord_12345",
+        "status": "pending",
+        "createdAt": "2025-03-24T10:00:00Z"
+      }
+    },
+    "dependencies": []
+  }
